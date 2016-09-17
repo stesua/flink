@@ -259,21 +259,42 @@ public abstract class AbstractAlignedProcessingTimeWindowOperator<KEY, IN, OUT, 
 
 		outView.flush();
 	}
+//	@Override
+//	public void restoreState(FSDataInputStream in) throws Exception {
+//
+//		DataInputView in = inputState.getState(getUserCodeClassloader());
+//
+//		final long nextEvaluationTime = in.readLong();
+//		final long nextSlideTime = in.readLong();
+//
+//		AbstractKeyedTimePanes<IN, KEY, STATE, OUT> panes = createPanes(keySelector, function);
+//		panes.readFromInput(in, keySerializer, stateTypeSerializer);
+//
+//		restoredState = new RestoredState<>(panes, nextEvaluationTime, nextSlideTime);
+//	}
+
 
 	@Override
 	public void restoreState(FSDataInputStream in) throws Exception {
 		super.restoreState(in);
+		DataInputViewStreamWrapper inView = null;
+		try {
+			 inView = new DataInputViewStreamWrapper(in);
 
-		DataInputViewStreamWrapper inView = new DataInputViewStreamWrapper(in);
+			final long nextEvaluationTime = inView.readLong();
+			final long nextSlideTime = inView.readLong();
 
-		final long nextEvaluationTime = inView.readLong();
-		final long nextSlideTime = inView.readLong();
+			AbstractKeyedTimePanes<IN, KEY, STATE, OUT> panes = createPanes(keySelector, function);
 
-		AbstractKeyedTimePanes<IN, KEY, STATE, OUT> panes = createPanes(keySelector, function);
+			panes.readFromInput(inView, keySerializer, stateTypeSerializer);
 
-		panes.readFromInput(inView, keySerializer, stateTypeSerializer);
-
-		restoredState = new RestoredState<>(panes, nextEvaluationTime, nextSlideTime);
+			restoredState = new RestoredState<>(panes, nextEvaluationTime, nextSlideTime);
+		}
+		finally {
+			if (inView != null) {
+				inView.close();
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------------
